@@ -1,4 +1,4 @@
-/* Bonito con escudo — Phaser 3. Balas desde arriba/abajo/izq/der; el toque orienta al personaje. */
+/* Bonito con escudo — Phaser 3. Toque en 8 direcciones; balas desde los 4 lados. */
 
 ;(function () {
   const EDGE = {
@@ -10,16 +10,26 @@
 
   const FACING = {
     UP: 'up',
+    UP_RIGHT: 'up_right',
     RIGHT: 'right',
+    DOWN_RIGHT: 'down_right',
     DOWN: 'down',
-    LEFT: 'left'
+    DOWN_LEFT: 'down_left',
+    LEFT: 'left',
+    UP_LEFT: 'up_left'
   }
 
-  const edgeToFacing = {
-    [EDGE.TOP]: FACING.UP,
-    [EDGE.RIGHT]: FACING.RIGHT,
-    [EDGE.BOTTOM]: FACING.DOWN,
-    [EDGE.LEFT]: FACING.LEFT
+  /** Qué orientaciones bloquean balas desde cada borde (diagonales cubren dos lados). */
+  const FACINGS_THAT_BLOCK_EDGE = {
+    [EDGE.TOP]: new Set([FACING.UP, FACING.UP_LEFT, FACING.UP_RIGHT]),
+    [EDGE.RIGHT]: new Set([FACING.RIGHT, FACING.UP_RIGHT, FACING.DOWN_RIGHT]),
+    [EDGE.BOTTOM]: new Set([FACING.DOWN, FACING.DOWN_LEFT, FACING.DOWN_RIGHT]),
+    [EDGE.LEFT]: new Set([FACING.LEFT, FACING.UP_LEFT, FACING.DOWN_LEFT])
+  }
+
+  function facingBlocksEdge(edge, facing) {
+    const set = FACINGS_THAT_BLOCK_EDGE[edge]
+    return set ? set.has(facing) : false
   }
 
   class MainScene extends Phaser.Scene {
@@ -106,13 +116,23 @@
       const dx = pointer.x - this.cx
       const dy = pointer.y - this.cy
 
-      if (dx === 0 && dy === 0) return
+      if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return
 
-      if (Math.abs(dx) >= Math.abs(dy)) {
-        this.facing = dx > 0 ? FACING.RIGHT : FACING.LEFT
-      } else {
-        this.facing = dy > 0 ? FACING.DOWN : FACING.UP
-      }
+      let a = Math.atan2(dy, dx)
+      if (a < 0) a += Math.PI * 2
+
+      const OCTANT_ORDER = [
+        FACING.RIGHT,
+        FACING.DOWN_RIGHT,
+        FACING.DOWN,
+        FACING.DOWN_LEFT,
+        FACING.LEFT,
+        FACING.UP_LEFT,
+        FACING.UP,
+        FACING.UP_RIGHT
+      ]
+      const idx = Math.floor((a + Math.PI / 8) / (Math.PI / 4)) % 8
+      this.facing = OCTANT_ORDER[idx]
       this.drawCharacter()
     }
 
@@ -120,10 +140,20 @@
       switch (this.facing) {
         case FACING.RIGHT:
           return 0
+        case FACING.DOWN_RIGHT:
+          return Math.PI / 4
         case FACING.DOWN:
           return Math.PI / 2
+        case FACING.DOWN_LEFT:
+          return (3 * Math.PI) / 4
         case FACING.LEFT:
           return Math.PI
+        case FACING.UP_LEFT:
+          return (-3 * Math.PI) / 4
+        case FACING.UP:
+          return -Math.PI / 2
+        case FACING.UP_RIGHT:
+          return -Math.PI / 4
         default:
           return -Math.PI / 2
       }
@@ -309,8 +339,7 @@
         }
 
         const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.cx, this.cy)
-        const needFace = edgeToFacing[bullet.spawnEdge]
-        const blocking = this.facing === needFace
+        const blocking = facingBlocksEdge(bullet.spawnEdge, this.facing)
 
         if (blocking && dist < this.shieldOuter && dist > this.shieldInner) {
           const bx = bullet.x
