@@ -99,8 +99,6 @@
 
       this.scheduleNextSpawn()
 
-      this.scoreEl = document.getElementById('score')
-      this.livesEl = document.getElementById('lives')
       this.syncHud()
     }
 
@@ -237,10 +235,12 @@
     }
 
     syncHud() {
-      if (this.scoreEl) this.scoreEl.textContent = `Puntos: ${this.score}`
-      if (this.livesEl) {
+      const scoreEl = document.getElementById('score')
+      const livesEl = document.getElementById('lives')
+      if (scoreEl) scoreEl.textContent = `Puntos: ${this.score}`
+      if (livesEl) {
         const hearts = Math.max(0, this.lives)
-        this.livesEl.textContent = '❤️'.repeat(hearts) + (hearts === 0 ? ' 💔' : '')
+        livesEl.textContent = '❤️'.repeat(hearts) + (hearts === 0 ? ' 💔' : '')
       }
     }
 
@@ -286,6 +286,10 @@
         overlay.destroy()
         txt.destroy()
         sub.destroy()
+
+        this.resetRunState()
+        this.syncHud()
+
         this.physics.resume()
         this.scene.restart()
       }
