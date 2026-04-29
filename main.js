@@ -22,22 +22,46 @@
     [EDGE.LEFT]: FACING.LEFT
   }
 
-  function pickRandomEdge() {
-    const edges = [EDGE.TOP, EDGE.RIGHT, EDGE.BOTTOM, EDGE.LEFT]
-    return edges[Phaser.Math.Between(0, edges.length - 1)]
-  }
-
   class MainScene extends Phaser.Scene {
     constructor() {
       super({ key: 'MainScene' })
+    }
+
+    resetRunState() {
       this.facing = FACING.UP
       this.score = 0
       this.lives = 3
       this.spawnDelayMs = 900
-      this.minSpawnDelay = 320
+      this.lastSpawnEdge = null
+      this.gameActive = true
+      this.pendingSpawn = null
+    }
+
+    pickSpawnEdge() {
+      const all = [EDGE.TOP, EDGE.RIGHT, EDGE.BOTTOM, EDGE.LEFT]
+      const pool = this.lastSpawnEdge ? all.filter(e => e !== this.lastSpawnEdge) : all.slice()
+      const edge = pool[Phaser.Math.Between(0, pool.length - 1)]
+      this.lastSpawnEdge = edge
+      return edge
+    }
+
+    clearSpawnTimer() {
+      if (this.pendingSpawn) {
+        this.pendingSpawn.remove(false)
+        this.pendingSpawn = null
+      }
+    }
+
+    onSceneShutdown() {
+      this.clearSpawnTimer()
+      this.input.off('pointerdown', this.onPointerDown, this)
     }
 
     create() {
+      this.resetRunState()
+
+      this.events.once('shutdown', this.onSceneShutdown, this)
+
       const { width, height } = this.scale
 
       this.cx = width / 2
@@ -73,8 +97,7 @@
 
       this.input.on('pointerdown', this.onPointerDown, this)
 
-      this.gameActive = true
-      this.scheduleSpawn()
+      this.scheduleNextSpawn()
 
       this.scoreEl = document.getElementById('score')
       this.livesEl = document.getElementById('lives')
@@ -159,7 +182,7 @@
     }
 
     spawnBullet() {
-      const edge = pickRandomEdge()
+      const edge = this.pickSpawnEdge()
       const { width, height } = this.scale
       let x = this.cx
       let y = this.cy
@@ -197,15 +220,19 @@
 
       this.bullets.add(bullet)
 
-      this.spawnDelayMs = Math.max(this.minSpawnDelay, this.spawnDelayMs - 7)
+      const minGap = 520
+      const ramp = 5
+      this.spawnDelayMs = Math.max(minGap, this.spawnDelayMs - ramp)
     }
 
-    scheduleSpawn() {
+    scheduleNextSpawn() {
       if (!this.gameActive) return
-      this.time.delayedCall(this.spawnDelayMs, () => {
+      this.clearSpawnTimer()
+      this.pendingSpawn = this.time.delayedCall(this.spawnDelayMs, () => {
+        this.pendingSpawn = null
         if (!this.gameActive || !this.sys.isActive()) return
         this.spawnBullet()
-        this.scheduleSpawn()
+        this.scheduleNextSpawn()
       })
     }
 
@@ -223,6 +250,7 @@
       this.cameras.main.shake(120, 0.012)
       if (this.lives <= 0) {
         this.gameActive = false
+        this.clearSpawnTimer()
         this.physics.pause()
         this.bullets.clear(true, true)
         this.showGameOver()
