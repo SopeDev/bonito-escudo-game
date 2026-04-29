@@ -55,6 +55,16 @@
 
       this.bullets = this.physics.add.group()
 
+      if (!this.textures.exists('bulletTex')) {
+        const g = this.make.graphics({ x: 0, y: 0, add: false })
+        g.fillStyle(0xff4757, 1)
+        g.fillCircle(10, 10, 9)
+        g.lineStyle(3, 0xffffff, 0.85)
+        g.strokeCircle(10, 10, 9)
+        g.generateTexture('bulletTex', 20, 20)
+        g.destroy()
+      }
+
       this.drawCharacter()
 
       this.input.on('pointerdown', this.onPointerDown, this)
@@ -170,17 +180,17 @@
           break
       }
 
-      const bullet = this.add.circle(x, y, 9, 0xff4757)
-      this.physics.add.existing(bullet)
-      bullet.body.setCircle(9)
+      const bullet = this.physics.add.sprite(x, y, 'bulletTex')
+      bullet.setOrigin(0.5)
+      if (bullet.body) {
+        bullet.body.setCircle(9, 1, 1)
+      }
 
       const speed = Phaser.Math.Between(160, 240)
       const angle = Phaser.Math.Angle.Between(x, y, this.cx, this.cy)
-      bullet.body.velocity.x = Math.cos(angle) * speed
-      bullet.body.velocity.y = Math.sin(angle) * speed
+      bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed)
 
       bullet.spawnEdge = edge
-      bullet.setStrokeStyle(3, 0xffffff, 0.85)
 
       this.bullets.add(bullet)
 
