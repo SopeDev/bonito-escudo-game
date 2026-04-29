@@ -52,8 +52,12 @@
 
       this.shields = this.add.graphics()
       this.bunny = this.add.graphics()
+      this.bunny.setDepth(20)
+      this.shields.setDepth(21)
 
-      this.bullets = this.physics.add.group()
+      // Sin física Arcade para las balas: en algunos navegadores / Scale FIT las velocidades
+      // del body no se integran bien cuando el sprite sale de un PhysicsGroup. Movimiento manual = fiable.
+      this.bullets = this.add.group()
 
       if (!this.textures.exists('bulletTex')) {
         const g = this.make.graphics({ x: 0, y: 0, add: false })
@@ -180,15 +184,14 @@
           break
       }
 
-      const bullet = this.physics.add.sprite(x, y, 'bulletTex')
+      const bullet = this.add.sprite(x, y, 'bulletTex')
       bullet.setOrigin(0.5)
-      if (bullet.body) {
-        bullet.body.setCircle(9, 1, 1)
-      }
+      bullet.setDepth(10)
 
       const speed = Phaser.Math.Between(160, 240)
       const angle = Phaser.Math.Angle.Between(x, y, this.cx, this.cy)
-      bullet.setVelocity(Math.cos(angle) * speed, Math.sin(angle) * speed)
+      bullet.vx = Math.cos(angle) * speed
+      bullet.vy = Math.sin(angle) * speed
 
       bullet.spawnEdge = edge
 
@@ -221,6 +224,7 @@
       if (this.lives <= 0) {
         this.gameActive = false
         this.physics.pause()
+        this.bullets.clear(true, true)
         this.showGameOver()
       }
     }
@@ -261,9 +265,16 @@
       this.input.once('pointerdown', restart)
     }
 
-    update() {
+    update(time, delta) {
+      const dt = delta / 1000
+
       this.bullets.children.iterate(bullet => {
         if (!bullet || !bullet.active) return
+
+        if (this.gameActive && typeof bullet.vx === 'number' && typeof bullet.vy === 'number') {
+          bullet.x += bullet.vx * dt
+          bullet.y += bullet.vy * dt
+        }
 
         const dist = Phaser.Math.Distance.Between(bullet.x, bullet.y, this.cx, this.cy)
         const needFace = edgeToFacing[bullet.spawnEdge]
