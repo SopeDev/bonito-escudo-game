@@ -19,6 +19,38 @@
     UP_LEFT: 'up_left'
   }
 
+  const STORAGE_HIGH = 'bonitoEscudo_highScore'
+  const STORAGE_LAST = 'bonitoEscudo_lastRoundScore'
+
+  function readStoredHigh() {
+    const v = localStorage.getItem(STORAGE_HIGH)
+    return v == null ? 0 : parseInt(v, 10) || 0
+  }
+
+  function readStoredLast() {
+    const v = localStorage.getItem(STORAGE_LAST)
+    if (v == null) return null
+    return parseInt(v, 10) || 0
+  }
+
+  function updateFooterStats(high, lastRound) {
+    const highEl = document.getElementById('stat-high')
+    const lastEl = document.getElementById('stat-last')
+    if (highEl) highEl.textContent = `Mejor puntuación: ${high}`
+    if (lastEl) {
+      lastEl.textContent =
+        lastRound === null ? 'Ronda anterior: —' : `Ronda anterior: ${lastRound}`
+    }
+  }
+
+  function persistRoundScores(roundScore) {
+    const prevHigh = readStoredHigh()
+    const newHigh = Math.max(prevHigh, roundScore)
+    localStorage.setItem(STORAGE_HIGH, String(newHigh))
+    localStorage.setItem(STORAGE_LAST, String(roundScore))
+    updateFooterStats(newHigh, roundScore)
+  }
+
   /** Qué orientaciones bloquean balas desde cada borde (diagonales cubren dos lados). */
   const FACINGS_THAT_BLOCK_EDGE = {
     [EDGE.TOP]: new Set([FACING.UP, FACING.UP_LEFT, FACING.UP_RIGHT]),
@@ -272,6 +304,8 @@
         const hearts = Math.max(0, this.lives)
         livesEl.textContent = '❤️'.repeat(hearts) + (hearts === 0 ? ' 💔' : '')
       }
+      const displayHigh = Math.max(readStoredHigh(), this.score)
+      updateFooterStats(displayHigh, readStoredLast())
     }
 
     hitPlayer() {
@@ -288,6 +322,8 @@
     }
 
     showGameOver() {
+      persistRoundScores(this.score)
+
       const { width, height } = this.scale
       const overlay = this.add.rectangle(this.cx, this.cy, width, height, 0x000000, 0.55)
       overlay.setDepth(50)
