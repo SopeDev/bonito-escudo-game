@@ -19,35 +19,98 @@
     UP_LEFT: 'up_left'
   }
 
-  const STORAGE_HIGH = 'bonitoEscudo_highScore'
-  const STORAGE_LAST = 'bonitoEscudo_lastRoundScore'
+  const STORAGE_KEY = 'bonitoEscudo_stats'
+  const LEGACY_HIGH = 'bonitoEscudo_highScore'
+  const LEGACY_LAST = 'bonitoEscudo_lastRoundScore'
+
+  let cachedHigh = 0
+  let cachedLast = null
+
+  function storageGet(key) {
+    try {
+      return localStorage.getItem(key)
+    } catch (_) {
+      return null
+    }
+  }
+
+  function storageSet(key, val) {
+    try {
+      localStorage.setItem(key, val)
+      try {
+        sessionStorage.setItem(key, val)
+      } catch (_) {}
+      return
+    } catch (_) {
+      try {
+        sessionStorage.setItem(key, val)
+      } catch (_) {}
+    }
+  }
+
+  function loadFromStorage() {
+    try {
+      migrateLegacyStorage()
+      let raw = storageGet(STORAGE_KEY)
+      if (!raw) {
+        try {
+          raw = sessionStorage.getItem(STORAGE_KEY)
+        } catch (_) {
+          raw = null
+        }
+      }
+      if (!raw) {
+        cachedHigh = 0
+        cachedLast = null
+        return
+      }
+      const d = JSON.parse(raw)
+      cachedHigh = Number(d.high) || 0
+      cachedLast = d.last === undefined || d.last === null ? null : Number(d.last) || 0
+    } catch (_) {
+      cachedHigh = 0
+      cachedLast = null
+    }
+  }
+
+  function migrateLegacyStorage() {
+    try {
+      if (storageGet(STORAGE_KEY)) return
+      const h = localStorage.getItem(LEGACY_HIGH)
+      const l = localStorage.getItem(LEGACY_LAST)
+      if (h == null && l == null) return
+      const high = h == null ? 0 : parseInt(h, 10) || 0
+      const last = l == null ? null : parseInt(l, 10) || 0
+      const payload = JSON.stringify({ high, last })
+      storageSet(STORAGE_KEY, payload)
+    } catch (_) {}
+  }
 
   function readStoredHigh() {
-    const v = localStorage.getItem(STORAGE_HIGH)
-    return v == null ? 0 : parseInt(v, 10) || 0
+    return cachedHigh
   }
 
   function readStoredLast() {
-    const v = localStorage.getItem(STORAGE_LAST)
-    if (v == null) return null
-    return parseInt(v, 10) || 0
+    return cachedLast
   }
 
   function updateFooterStats(high, lastRound) {
     const highEl = document.getElementById('stat-high')
     const lastEl = document.getElementById('stat-last')
-    if (highEl) highEl.textContent = `Mejor puntuación: ${high}`
+    if (highEl) highEl.textContent = `High score: ${high}`
     if (lastEl) {
       lastEl.textContent =
-        lastRound === null ? 'Ronda anterior: —' : `Ronda anterior: ${lastRound}`
+        lastRound === null ? 'Last session: —' : `Last session: ${lastRound}`
     }
   }
 
   function persistRoundScores(roundScore) {
-    const prevHigh = readStoredHigh()
-    const newHigh = Math.max(prevHigh, roundScore)
-    localStorage.setItem(STORAGE_HIGH, String(newHigh))
-    localStorage.setItem(STORAGE_LAST, String(roundScore))
+    loadFromStorage()
+    const newHigh = Math.max(cachedHigh, roundScore)
+    cachedHigh = newHigh
+    cachedLast = roundScore
+    const payload = JSON.stringify({ high: newHigh, last: roundScore })
+    storageSet(STORAGE_KEY, payload)
     updateFooterStats(newHigh, roundScore)
   }
 
@@ -101,6 +164,7 @@
 
     create() {
       this.resetRunState()
+      loadFromStorage()
 
       this.events.once('shutdown', this.onSceneShutdown, this)
 
@@ -401,6 +465,9 @@
       })
     }
   }
+
+  loadFromStorage()
+  updateFooterStats(cachedHigh, cachedLast)
 
   const parent = 'game'
 
